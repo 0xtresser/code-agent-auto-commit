@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "enabled": true,
+  "worktree": "/path/to/your/repo",
+  "commit": {
+    "mode": "single",
+    "fallbackPrefix": "chore(auto)",
+    "maxMessageLength": 72
+  },
+  "ai": {
+    "enabled": true,
+    "timeoutMs": 15000,
+    "model": "openai/gpt-4.1-mini",
+    "defaultProvider": "openai",
+    "providers": {
+      "openai": {
+        "api": "openai-completions",
+        "baseUrl": "https://api.openai.com/v1",
+        "apiKeyEnv": "OPENAI_API_KEY"
+      },
+      "anthropic": {
+        "api": "anthropic-messages",
+        "baseUrl": "https://api.anthropic.com/v1",
+        "apiKeyEnv": "ANTHROPIC_API_KEY"
+      },
+      "moonshot": {
+        "api": "openai-completions",
+        "baseUrl": "https://api.moonshot.ai/v1",
+        "apiKeyEnv": "MOONSHOT_API_KEY"
+      },
+      "minimax": {
+        "api": "openai-completions",
+        "baseUrl": "https://api.minimax.chat/v1",
+        "apiKeyEnv": "MINIMAX_API_KEY"
+      },
+      "ollama": {
+        "api": "openai-completions",
+        "baseUrl": "http://127.0.0.1:11434/v1",
+        "apiKeyEnv": "OLLAMA_API_KEY"
+      }
+    }
+  },
+  "push": {
+    "enabled": false,
+    "provider": "github",
+    "remote": "origin",
+    "branch": "main"
+  },
+  "filters": {
+    "include": [],
+    "exclude": [".env", ".env.*", "*.pem", "*.key", "*.p12"]
+  }
+}
