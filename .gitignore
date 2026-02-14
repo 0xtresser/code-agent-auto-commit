@@ -16,3 +16,6 @@ INTERNAL.md
 .DS_Store
 session-*.md
 .local/
+
+# NPM files
+code-agent-auto-commit-*.tgz
