@@ -1,0 +1,57 @@
+{
+  "name": "code-agent-auto-commit",
+  "version": "0.1.0",
+  "description": "Configurable chat-end auto-commit for OpenCode, Codex CLI, and Claude Code",
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "cac": "dist/cli.js",
+    "code-agent-auto-commit": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "SECURITY.md",
+    "docs",
+    ".code-agent-auto-commit.example.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test dist/test/*.test.js",
+    "prepare": "pnpm run build"
+  },
+  "keywords": [
+    "git",
+    "commit",
+    "automation",
+    "opencode",
+    "codex",
+    "claude-code"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.28.2",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/code-agent-auto-commit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/code-agent-auto-commit/issues"
+  },
+  "homepage": "https://github.com/your-org/code-agent-auto-commit#readme",
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  }
+}
