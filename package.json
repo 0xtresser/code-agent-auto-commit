@@ -1,7 +1,7 @@
 {
   "name": "code-agent-auto-commit",
-  "version": "0.1.0",
-  "description": "Configurable chat-end auto-commit for OpenCode, Codex CLI, and Claude Code",
+  "version": "1.0.0",
+  "description": "CAC provides configurable AI auto-commit(using your git account) for OpenCode, Claude Code, Codex, and other AI code agents",
   "license": "MIT",
   "type": "commonjs",
   "main": "dist/index.js",
@@ -44,12 +44,12 @@
   "packageManager": "pnpm@10.28.2",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/code-agent-auto-commit.git"
+    "url": "https://github.com/0xtresser/code-agent-auto-commit.git"
   },
   "bugs": {
-    "url": "https://github.com/your-org/code-agent-auto-commit/issues"
+    "url": "https://github.com/0xtresser/code-agent-auto-commit/issues"
   },
-  "homepage": "https://github.com/your-org/code-agent-auto-commit#readme",
+  "homepage": "https://github.com/0xtresser/code-agent-auto-commit#readme",
   "devDependencies": {
     "@types/node": "^22.10.0",
     "typescript": "^5.7.2"
