@@ -76,7 +76,7 @@ async function buildMessage(
   stagedPath: string | undefined,
   fallback: string,
   worktree: string,
-): Promise<{ message: string; usage: TokenUsage | undefined }> {
+): Promise<{ message: string; usage: TokenUsage | undefined; warning?: string }> {
   const summary = getStagedSummary(worktree, stagedPath)
   const result = await generateCommitMessage(aiConfig, summary, maxLength)
   if (result.message) {
@@ -85,7 +85,7 @@ async function buildMessage(
   const msg = fallback.length <= maxLength
     ? fallback
     : `${normalizeFallbackType(prefix)}: update changes`
-  return { message: msg, usage: result.usage }
+  return { message: msg, usage: result.usage, warning: result.warning }
 }
 
 export async function runAutoCommit(context: RunContext, configOptions: LoadConfigOptions): Promise<RunResult> {
@@ -117,6 +117,7 @@ export async function runAutoCommit(context: RunContext, configOptions: LoadConf
 
   const commits: CommitRecord[] = []
   const totalUsage: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+  let firstWarning: string | undefined
 
   function addUsage(usage: TokenUsage | undefined): void {
     if (!usage) return
@@ -150,6 +151,7 @@ export async function runAutoCommit(context: RunContext, configOptions: LoadConf
       worktree,
     )
     addUsage(result.usage)
+    if (result.warning && !firstWarning) firstWarning = result.warning
 
     const hash = commit(worktree, result.message)
     commits.push({
@@ -178,6 +180,7 @@ export async function runAutoCommit(context: RunContext, configOptions: LoadConf
         worktree,
       )
       addUsage(result.usage)
+      if (result.warning && !firstWarning) firstWarning = result.warning
 
       const hash = commit(worktree, result.message)
       commits.push({
@@ -203,5 +206,6 @@ export async function runAutoCommit(context: RunContext, configOptions: LoadConf
     committed: commits,
     pushed,
     tokenUsage: hasUsage ? totalUsage : undefined,
+    aiWarning: firstWarning,
   }
 }
