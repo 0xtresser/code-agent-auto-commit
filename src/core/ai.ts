@@ -13,6 +13,39 @@ const TYPE_ALIASES: Record<string, string> = {
   refector: "refactor",
 }
 
+const MINIMAX_MODEL_ALIASES: Record<string, string> = {
+  "minimax-m2.5": "MiniMax-M2.5",
+  "minimax-m2.5-highspeed": "MiniMax-M2.5-highspeed",
+  "minimax-m2.1": "MiniMax-M2.1",
+  "minimax-m2.1-highspeed": "MiniMax-M2.1-highspeed",
+  "minimax-m2": "MiniMax-M2",
+  "minimax-text-01": "MiniMax-Text-01",
+  "text-01": "MiniMax-Text-01",
+}
+
+function normalizeProviderModel(provider: string, model: string): string {
+  const trimmed = model.trim()
+  const raw = trimmed.includes("/") ? trimmed.slice(trimmed.lastIndexOf("/") + 1) : trimmed
+
+  if (provider !== "minimax") {
+    return raw
+  }
+
+  return MINIMAX_MODEL_ALIASES[raw.toLowerCase()] ?? raw
+}
+
+function minimaxFallbackModel(model: string): string | undefined {
+  return model === "MiniMax-Text-01" ? undefined : "MiniMax-Text-01"
+}
+
+function isUnknownModelError(status: number, body: string): boolean {
+  if (status < 400 || status >= 500) {
+    return false
+  }
+
+  return /unknown\s+model|invalid\s+model|model.*not\s+found|does\s+not\s+exist|not\s+supported/i.test(body)
+}
+
 function normalizeCommitType(raw: string): string | undefined {
   const value = raw.trim().toLowerCase()
   if (VALID_TYPES.has(value)) {
@@ -139,6 +172,7 @@ function validateAIConfig(ai: AIConfig): string | undefined {
 }
 
 async function generateOpenAiStyleMessage(
+  providerName: string,
   provider: AIProviderConfig,
   model: string,
   summary: CommitSummary,
@@ -154,44 +188,72 @@ async function generateOpenAiStyleMessage(
     headers.Authorization = `Bearer ${apiKey}`
   }
 
-  const response = await fetch(`${provider.baseUrl.replace(/\/$/, "")}/chat/completions`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      model,
-      temperature: 0.2,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You generate exactly one conventional commit message. Format: '<type>(<scope>): <description>'. Scope is optional. Allowed types: feat, fix, refactor, docs, style, test, chore, perf, ci, build. Description must be imperative, lowercase, no period. Describe the actual change, not just 'update <file>'. No quotes. No code block.",
-        },
-        {
-          role: "user",
-          content: buildUserPrompt(summary, maxLength),
-        },
-      ],
-    }),
-    signal,
-  })
+  async function requestModel(modelName: string): Promise<
+    { ok: true; content: string | undefined; usage: TokenUsage | undefined }
+    | { ok: false; status: number; body: string }
+  > {
+    const response = await fetch(`${provider.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: modelName,
+        temperature: 0.2,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You generate exactly one conventional commit message. Format: '<type>(<scope>): <description>'. Scope is optional. Allowed types: feat, fix, refactor, docs, style, test, chore, perf, ci, build. Description must be imperative, lowercase, no period. Describe the actual change, not just 'update <file>'. No quotes. No code block.",
+          },
+          {
+            role: "user",
+            content: buildUserPrompt(summary, maxLength),
+          },
+        ],
+      }),
+      signal,
+    })
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => "")
-    return { content: undefined, usage: undefined, error: `HTTP ${response.status}: ${body.slice(0, 200)}` }
+    if (!response.ok) {
+      const body = await response.text().catch(() => "")
+      return { ok: false, status: response.status, body }
+    }
+
+    const payload = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
+    }
+    const usage: TokenUsage | undefined = payload.usage
+      ? {
+          promptTokens: payload.usage.prompt_tokens ?? 0,
+          completionTokens: payload.usage.completion_tokens ?? 0,
+          totalTokens: payload.usage.total_tokens ?? 0,
+        }
+      : undefined
+    return { ok: true, content: payload.choices?.[0]?.message?.content, usage }
   }
 
-  const payload = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>
-    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
+  const first = await requestModel(model)
+  if (first.ok) {
+    return { content: first.content, usage: first.usage }
   }
-  const usage: TokenUsage | undefined = payload.usage
-    ? {
-        promptTokens: payload.usage.prompt_tokens ?? 0,
-        completionTokens: payload.usage.completion_tokens ?? 0,
-        totalTokens: payload.usage.total_tokens ?? 0,
+
+  if (providerName === "minimax" && isUnknownModelError(first.status, first.body)) {
+    const fallback = minimaxFallbackModel(model)
+    if (fallback) {
+      const retry = await requestModel(fallback)
+      if (retry.ok) {
+        return { content: retry.content, usage: retry.usage }
       }
-    : undefined
-  return { content: payload.choices?.[0]?.message?.content, usage }
+
+      return {
+        content: undefined,
+        usage: undefined,
+        error: `HTTP ${first.status}: ${first.body.slice(0, 200)} | retry(${fallback}) HTTP ${retry.status}: ${retry.body.slice(0, 120)}`,
+      }
+    }
+  }
+
+  return { content: undefined, usage: undefined, error: `HTTP ${first.status}: ${first.body.slice(0, 200)}` }
 }
 
 async function generateAnthropicStyleMessage(
@@ -262,6 +324,7 @@ export async function generateCommitMessage(
   }
 
   const { provider, model } = splitModelRef(ai.model, ai.defaultProvider)
+  const resolvedModel = normalizeProviderModel(provider, model)
   const providerConfig = ai.providers[provider]
 
   const controller = new AbortController()
@@ -270,9 +333,9 @@ export async function generateCommitMessage(
   try {
     let result: { content: string | undefined; usage: TokenUsage | undefined; error?: string }
     if (providerConfig.api === "openai-completions") {
-      result = await generateOpenAiStyleMessage(providerConfig, model, summary, maxLength, controller.signal)
+      result = await generateOpenAiStyleMessage(provider, providerConfig, resolvedModel, summary, maxLength, controller.signal)
     } else {
-      result = await generateAnthropicStyleMessage(providerConfig, model, summary, maxLength, controller.signal)
+      result = await generateAnthropicStyleMessage(providerConfig, resolvedModel, summary, maxLength, controller.signal)
     }
 
     if (result.error) {
@@ -298,6 +361,7 @@ export async function testAI(ai: AIConfig, userMessage: string): Promise<AITestR
   }
 
   const { provider, model } = splitModelRef(ai.model, ai.defaultProvider)
+  const resolvedModel = normalizeProviderModel(provider, model)
   const providerConfig = ai.providers[provider]
   const apiKey = getApiKey(providerConfig)!
 
@@ -311,29 +375,60 @@ export async function testAI(ai: AIConfig, userMessage: string): Promise<AITestR
         Authorization: `Bearer ${apiKey}`,
         ...(providerConfig.headers ?? {}),
       }
-      const response = await fetch(`${providerConfig.baseUrl.replace(/\/$/, "")}/chat/completions`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          model,
-          temperature: 0.2,
-          messages: [{ role: "user", content: userMessage }],
-        }),
-        signal: controller.signal,
-      })
-      if (!response.ok) {
-        const body = await response.text().catch(() => "")
-        return { ok: false, error: `HTTP ${response.status}: ${body.slice(0, 300)}` }
+
+      async function requestModel(modelName: string): Promise<
+        { ok: true; reply: string; usage: TokenUsage | undefined }
+        | { ok: false; status: number; body: string }
+      > {
+        const response = await fetch(`${providerConfig.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model: modelName,
+            temperature: 0.2,
+            messages: [{ role: "user", content: userMessage }],
+          }),
+          signal: controller.signal,
+        })
+        if (!response.ok) {
+          const body = await response.text().catch(() => "")
+          return { ok: false, status: response.status, body }
+        }
+
+        const payload = (await response.json()) as {
+          choices?: Array<{ message?: { content?: string } }>
+          usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
+        }
+        const usage: TokenUsage | undefined = payload.usage
+          ? {
+              promptTokens: payload.usage.prompt_tokens ?? 0,
+              completionTokens: payload.usage.completion_tokens ?? 0,
+              totalTokens: payload.usage.total_tokens ?? 0,
+            }
+          : undefined
+        return { ok: true, reply: payload.choices?.[0]?.message?.content ?? "", usage }
       }
-      const payload = (await response.json()) as {
-        choices?: Array<{ message?: { content?: string } }>
-        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
+
+      const first = await requestModel(resolvedModel)
+      if (first.ok) {
+        return { ok: true, reply: first.reply, usage: first.usage }
       }
-      const reply = payload.choices?.[0]?.message?.content ?? ""
-      const usage: TokenUsage | undefined = payload.usage
-        ? { promptTokens: payload.usage.prompt_tokens ?? 0, completionTokens: payload.usage.completion_tokens ?? 0, totalTokens: payload.usage.total_tokens ?? 0 }
-        : undefined
-      return { ok: true, reply, usage }
+
+      if (provider === "minimax" && isUnknownModelError(first.status, first.body)) {
+        const fallback = minimaxFallbackModel(resolvedModel)
+        if (fallback) {
+          const retry = await requestModel(fallback)
+          if (retry.ok) {
+            return { ok: true, reply: retry.reply, usage: retry.usage }
+          }
+          return {
+            ok: false,
+            error: `HTTP ${first.status}: ${first.body.slice(0, 300)} | retry(${fallback}) HTTP ${retry.status}: ${retry.body.slice(0, 200)}`,
+          }
+        }
+      }
+
+      return { ok: false, error: `HTTP ${first.status}: ${first.body.slice(0, 300)}` }
     } else {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -345,7 +440,7 @@ export async function testAI(ai: AIConfig, userMessage: string): Promise<AITestR
         method: "POST",
         headers,
         body: JSON.stringify({
-          model,
+          model: resolvedModel,
           max_tokens: 256,
           messages: [{ role: "user", content: userMessage }],
         }),
