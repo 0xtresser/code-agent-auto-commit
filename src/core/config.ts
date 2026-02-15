@@ -49,7 +49,7 @@ const DEFAULT_CONFIG = (worktree: string): AutoCommitConfig => ({
       },
       minimax: {
         api: "openai-completions",
-        baseUrl: "https://api.minimax.chat/v1",
+        baseUrl: "https://api.minimaxi.chat/v1",
         apiKeyEnv: "MINIMAX_API_KEY",
       },
       "kimi-coding": {
