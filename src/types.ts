@@ -67,12 +67,24 @@ export interface CommitRecord {
   files: string[]
 }
 
+export interface TokenUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
+export interface AIGenerateResult {
+  message: string | undefined
+  usage: TokenUsage | undefined
+}
+
 export interface RunResult {
   skipped: boolean
   reason?: string
   worktree: string
   committed: CommitRecord[]
   pushed: boolean
+  tokenUsage?: TokenUsage
 }
 
 export interface RunContext {
