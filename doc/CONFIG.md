@@ -20,28 +20,28 @@
     "maxMessageLength": 72
   },
   "ai": {
-    "enabled": false,
+    "enabled": true,
     "timeoutMs": 15000,
-    "model": "openai/gpt-4.1-mini",
-    "defaultProvider": "openai",
+    "model": "minimax/MiniMax-M2.5-highspeed",
+    "defaultProvider": "minimax",
     "providers": {
       "openai": {
         "api": "openai-completions",
         "baseUrl": "https://api.openai.com/v1",
         "apiKeyEnv": "OPENAI_API_KEY"
       },
-      "anthropic": {
-        "api": "anthropic-messages",
-        "baseUrl": "https://api.anthropic.com/v1",
-        "apiKeyEnv": "ANTHROPIC_API_KEY"
+      "minimax": {
+        "api": "openai-completions",
+        "baseUrl": "https://api.minimaxi.chat/v1",
+        "apiKeyEnv": "MINIMAX_API_KEY"
       }
     }
   },
   "push": {
-    "enabled": false,
+    "enabled": true,
     "provider": "github",
     "remote": "origin",
-    "branch": ""
+    "branch": "main"
   },
   "filters": {
     "include": [],
@@ -61,6 +61,22 @@
 - `ai.providers.<name>.apiKey` or `apiKeyEnv`: API key source (env preferred).
 - `ai.providers.<name>.headers`: optional custom headers.
 
+## API Key Resolution
+
+`cac` resolves API keys automatically in this order (first match wins, no override):
+
+| Priority | Source | Description |
+|----------|--------|-------------|
+| 1 | `process.env` | Environment variable in current shell |
+| 2 | `~/.config/code-agent-auto-commit/keys.env` | Global keys file (`cac ai set-key` writes here) |
+| 3 | `.cac/.env` | Project-level env file (`cac init` generates this) |
+| 4 | `ai.providers.<name>.apiKey` | Direct key in config JSON (not recommended) |
+
+Both `export KEY='value'` and `KEY=value` formats are supported in env files.
+
+This auto-loading ensures **hooks work without manual `source`** — the subprocess
+reads keys from files even when shell env vars are not inherited.
+
 ## Notes
 
 - `commit.mode`
@@ -70,6 +86,5 @@
   - `github`: remote URL must contain `github`
   - `gitlab`: remote URL must contain `gitlab`
   - `generic`: no provider URL validation
-- Keep API keys in environment variables when possible.
-- `cac init` also creates `.cac/.env.example` and `.cac/.env` with provider key variables.
+- `cac init` creates `.cac/.env.example` and `.cac/.env` with provider key variables.
 - Hook-triggered `cac run` writes output logs to `.cac/run-<timestamp>.log`.

@@ -14,26 +14,30 @@ It runs commits automatically when a chat/agent turn ends.
 # 1. 初始化配置
 cac init
 
-# 2. 配置 AI API Key（必须，否则无法生成 AI commit message）
-#    编辑 .cac/.code-agent-auto-commit.json，设置 model 和 defaultProvider。
-#    在 .cac/.env 中填入 API Key 后加载：
-source .cac/.env
-#    或者:
-cac ai set-key <provider|ENV_VAR> <api-key> [--config <path>]
+# 2. 配置 AI API Key（必须，二选一）
+#    全局设置（推荐，所有项目通用）：
+cac ai set-key <provider|ENV_VAR> <api-key>
+#    或项目级（编辑 .cac/.env）：
+echo 'MINIMAX_API_KEY=sk-xxx' >> .cac/.env
 
 # 3. 安装钩子
 cac install --tool all --scope project
 
-# 4. 验证状态
+# 4. 验证
 cac status --scope project
+cac ai "hello"
 ```
 
 > **重要：** `cac init` 之后**必须**配置 AI provider 的 API Key。
 > 没有有效的 Key，AI 生成 commit message 会失败，`cac` 会退回到
 > `chore(auto): ...` 格式的通用消息。
 >
+> **Key 自动加载：** 无需手动 `source .cac/.env`。`cac run` 和 `cac ai` 启动时
+> 会自动从 `~/.config/.../keys.env`（全局）和 `.cac/.env`（项目级）加载 API Key。
+> Hook 触发的子进程也能正常工作。
+>
 > **模型选择建议：** 推荐选择速度快、轻量的模型（如 `gpt-4.1-mini`、
-> `MiniMax-M2.1-highspeed`）。Commit message 内容很短，速度比智能更重要。
+> `MiniMax-M2.5-highspeed`）。Commit message 内容很短，速度比智能更重要。
 
 ## Command Reference
 
@@ -85,10 +89,22 @@ Default location in repository root: `.cac/.code-agent-auto-commit.json`
 
 For full field details, see `doc/CONFIG.md`.
 
+## API Key 解析顺序
+
+`cac` 按以下优先级自动查找 API Key（先到先得，不覆盖）：
+
+| 优先级 | 来源 | 说明 |
+|--------|------|------|
+| 1 | `process.env` | 当前 shell 已有的环境变量 |
+| 2 | `~/.config/code-agent-auto-commit/keys.env` | 全局 key 文件（`cac ai set-key` 写入） |
+| 3 | `.cac/.env` | 项目级 env 文件（`cac init` 生成） |
+| 4 | `ai.providers.<name>.apiKey` | 配置文件中直接写的 key（不推荐） |
+
+env 文件支持 `export KEY='value'` 和 `KEY=value` 两种格式。
+
 ## Important Notes
 
 - `.env` and key-like files are excluded by default.
 - `per-file` mode requires a clean staging area.
 - Push is disabled by default; verify remote and branch settings before enabling.
-- `ai.providers.<name>.apiKeyEnv` must be an environment variable name (for example, `MINIMAX_API_KEY`), not the raw key.
-- If you want to store the key directly in config, use `ai.providers.<name>.apiKey`.
+- Hook 触发的 `cac run` 会自动加载 env 文件，无需手动 `source`。

@@ -44,23 +44,20 @@ cac --help
 # 1. Initialize config
 cac init
 
-# 2. Configure AI API key for commit messages
-#    Edit .cac/.code-agent-auto-commit.json — set your model and defaultProvider.
-#    Fill keys in .cac/.env and load them:
-source .cac/.env
-#    OR:
-cac ai set-key <provider|ENV_VAR> <api-key> [--config <path>]
+# 2. Configure AI API key (pick one method):
+#    Global (recommended — works across all projects):
+cac ai set-key <provider|ENV_VAR> <api-key>
+#    Or project-level (edit .cac/.env):
+echo 'MINIMAX_API_KEY=sk-xxx' >> .cac/.env
 
 # 3. Install hooks
 cac install --tool all --scope project
 
 # 4. Verify
 cac status --scope project
+cac ai "hello"
 
-# 5. Git config
-git init
-
-# 6. Agentic coding
+# 5. Agentic coding
 opencode / claude / codex
 ```
 
@@ -69,7 +66,7 @@ opencode / claude / codex
 > generic `chore(auto): ...` prefixed messages.
 >
 > **Model tip:** Choose a fast, lightweight model (e.g. `gpt-4.1-mini`,
-> `MiniMax-M2.1-highspeed`). Commit messages are short — speed matters more
+> `MiniMax-M2.5-highspeed`). Commit messages are short — speed matters more
 > than intelligence here.
 
 ## Commands
@@ -116,11 +113,17 @@ Full schema and options:
 - `doc/CONFIG.md`
 - `doc/zh-CN.md`
 
-### AI Key Fields
+### AI Key Resolution
 
-- `ai.providers.<name>.apiKeyEnv` expects an environment variable name (for example, `MINIMAX_API_KEY`), not the raw key value.
-- If you prefer storing a key directly in config, use `ai.providers.<name>.apiKey`.
-- If AI request fails (missing key, invalid provider/model, or non-2xx response), `cac` falls back to `commit.fallbackPrefix`-style messages.
+`cac` resolves API keys automatically in this order (first match wins):
+
+1. **`process.env`** — environment variable already set in the current shell
+2. **`~/.config/code-agent-auto-commit/keys.env`** — global keys file (written by `cac ai set-key`)
+3. **`.cac/.env`** — project-level env file (created by `cac init`)
+4. **`ai.providers.<name>.apiKey`** — key stored directly in config (not recommended)
+
+This means **hooks work out of the box** — no need to manually `source .cac/.env` before running.
+If AI request fails (missing key, invalid provider/model, or non-2xx response), `cac` falls back to `commit.fallbackPrefix`-style messages.
 
 ## AI Models (Multi-Provider)
 
