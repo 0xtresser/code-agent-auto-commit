@@ -12,9 +12,9 @@ import {
   push,
   stagePath,
 } from "./git"
-import type { AIConfig, ChangedFile, CommitRecord, LoadConfigOptions, RunContext, RunResult } from "../types"
+import type { AIConfig, ChangedFile, CommitRecord, LoadConfigOptions, RunContext, RunResult, TokenUsage } from "../types"
 
-function normalizeFallbackType(prefix: string): "feat" | "fix" | "refector" {
+function normalizeFallbackType(prefix: string): string {
   const value = prefix.toLowerCase()
   if (/(^|[^a-z])(feat|feature)([^a-z]|$)/.test(value)) {
     return "feat"
@@ -22,10 +22,11 @@ function normalizeFallbackType(prefix: string): "feat" | "fix" | "refector" {
   if (/(^|[^a-z])(fix|bugfix|hotfix)([^a-z]|$)/.test(value)) {
     return "fix"
   }
-  if (/(^|[^a-z])(refector|refactor|chore|docs|style|test|perf|build|ci|revert)([^a-z]|$)/.test(value)) {
-    return "refector"
+  if (/(^|[^a-z])(refactor|chore|docs|style|test|perf|build|ci|revert)([^a-z]|$)/.test(value)) {
+    const match = value.match(/(refactor|chore|docs|style|test|perf|build|ci|revert)/)
+    return match ? match[1] : "chore"
   }
-  return "refector"
+  return "chore"
 }
 
 function fallbackSingleMessage(prefix: string, count: number): string {
@@ -75,16 +76,16 @@ async function buildMessage(
   stagedPath: string | undefined,
   fallback: string,
   worktree: string,
-): Promise<string> {
+): Promise<{ message: string; usage: TokenUsage | undefined }> {
   const summary = getStagedSummary(worktree, stagedPath)
-  const generated = await generateCommitMessage(aiConfig, summary, maxLength)
-  if (generated) {
-    return generated
+  const result = await generateCommitMessage(aiConfig, summary, maxLength)
+  if (result.message) {
+    return { message: result.message, usage: result.usage }
   }
-  if (fallback.length <= maxLength) {
-    return fallback
-  }
-  return `${normalizeFallbackType(prefix)}: update changes`
+  const msg = fallback.length <= maxLength
+    ? fallback
+    : `${normalizeFallbackType(prefix)}: update changes`
+  return { message: msg, usage: result.usage }
 }
 
 export async function runAutoCommit(context: RunContext, configOptions: LoadConfigOptions): Promise<RunResult> {
@@ -115,6 +116,14 @@ export async function runAutoCommit(context: RunContext, configOptions: LoadConf
   }
 
   const commits: CommitRecord[] = []
+  const totalUsage: TokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+
+  function addUsage(usage: TokenUsage | undefined): void {
+    if (!usage) return
+    totalUsage.promptTokens += usage.promptTokens
+    totalUsage.completionTokens += usage.completionTokens
+    totalUsage.totalTokens += usage.totalTokens
+  }
 
   if (config.commit.mode === "single") {
     for (const file of changed) {
@@ -132,7 +141,7 @@ export async function runAutoCommit(context: RunContext, configOptions: LoadConf
     }
 
     const fallback = fallbackSingleMessage(config.commit.fallbackPrefix, changed.length)
-    const message = await buildMessage(
+    const result = await buildMessage(
       config.commit.fallbackPrefix,
       config.commit.maxMessageLength,
       config.ai,
@@ -140,11 +149,12 @@ export async function runAutoCommit(context: RunContext, configOptions: LoadConf
       fallback,
       worktree,
     )
+    addUsage(result.usage)
 
-    const hash = commit(worktree, message)
+    const hash = commit(worktree, result.message)
     commits.push({
       hash,
-      message,
+      message: result.message,
       files: changed.map((item) => item.path),
     })
   } else {
@@ -159,7 +169,7 @@ export async function runAutoCommit(context: RunContext, configOptions: LoadConf
       }
 
       const fallback = fallbackPerFileMessage(config.commit.fallbackPrefix, file)
-      const message = await buildMessage(
+      const result = await buildMessage(
         config.commit.fallbackPrefix,
         config.commit.maxMessageLength,
         config.ai,
@@ -167,11 +177,12 @@ export async function runAutoCommit(context: RunContext, configOptions: LoadConf
         fallback,
         worktree,
       )
+      addUsage(result.usage)
 
-      const hash = commit(worktree, message)
+      const hash = commit(worktree, result.message)
       commits.push({
         hash,
-        message,
+        message: result.message,
         files: [file.path],
       })
     }
@@ -184,10 +195,13 @@ export async function runAutoCommit(context: RunContext, configOptions: LoadConf
     pushed = true
   }
 
+  const hasUsage = totalUsage.totalTokens > 0
+
   return {
     skipped: false,
     worktree,
     committed: commits,
     pushed,
+    tokenUsage: hasUsage ? totalUsage : undefined,
   }
 }
