@@ -3,8 +3,8 @@ import os from "node:os"
 import path from "node:path"
 import test from "node:test"
 import assert from "node:assert/strict"
-import { initConfigFile, loadConfig, updateConfigWorktree } from "../core/config"
-import { getProjectConfigPath } from "../core/fs"
+import { initConfigFile, loadConfig, updateConfigWorktree } from "../src/core/config"
+import { getProjectConfigPath } from "../src/core/fs"
 
 test("init and update config file", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "code-agent-auto-commit-"))

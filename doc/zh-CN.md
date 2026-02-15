@@ -83,7 +83,7 @@ cac status --scope project
 
 Default location in repository root: `.cac/.code-agent-auto-commit.json`
 
-For full field details, see `docs/CONFIG.md`.
+For full field details, see `doc/CONFIG.md`.
 
 ## Important Notes
 

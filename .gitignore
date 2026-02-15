@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-test/
 coverage/
 *.log
 
@@ -9,6 +10,9 @@ coverage/
 .claude/
 .cac/
 
+# Agent private rules
+AGENTS.md
+
 # Internal-only docs
 INTERNAL.md
 
@@ -17,6 +21,13 @@ INTERNAL.md
 session-*.md
 .local/
 
+# IDE
+.idea/
+.vscode/
+
+# Environment
+.env
+.env.*
+
 # NPM files
 code-agent-auto-commit-*.tgz
-.env

@@ -113,8 +113,8 @@ You can copy from:
 
 Full schema and options:
 
-- `docs/CONFIG.md`
-- `docs/zh-CN.md`
+- `doc/CONFIG.md`
+- `doc/zh-CN.md`
 
 ### AI Key Fields
 

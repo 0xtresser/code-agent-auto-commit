@@ -42,11 +42,11 @@ export function listChangedFiles(worktree: string): ChangedFile[] {
       if (secondNull === -1) {
         break
       }
-      const secondPath = output.slice(offset, secondNull)
+      const renamedFrom = output.slice(offset, secondNull)
       offset = secondNull + 1
       files.push({
-        path: secondPath,
-        originalPath: firstPath,
+        path: firstPath,
+        originalPath: renamedFrom,
         indexStatus,
         worktreeStatus,
       })

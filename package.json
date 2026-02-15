@@ -17,7 +17,7 @@
     "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md",
     "SECURITY.md",
-    "docs",
+    "doc",
     ".code-agent-auto-commit.example.json"
   ],
   "publishConfig": {
@@ -27,7 +27,7 @@
     "clean": "rm -rf dist",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test dist/test/*.test.js",
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/tests/*.test.js",
     "prepare": "pnpm run build"
   },
   "keywords": [
