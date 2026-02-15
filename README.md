@@ -45,8 +45,8 @@ cac --help
 cac init
 
 # 2. Configure AI API key for commit messages
-#    Edit .code-agent-auto-commit.json — set your provider, model, and API key env var.
-#    Or export the key in your shell:
+#    Edit .code-agent-auto-commit.json — set your model, and defaultProvider.
+#    Then export the key in your shell:
 export MINIMAX_API_KEY='your-api-key'   # or OPENAI_API_KEY, etc.
 
 # 3. Install hooks
