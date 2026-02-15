@@ -76,6 +76,14 @@ export interface TokenUsage {
 export interface AIGenerateResult {
   message: string | undefined
   usage: TokenUsage | undefined
+  warning?: string
+}
+
+export interface AITestResult {
+  ok: boolean
+  reply?: string
+  usage?: TokenUsage
+  error?: string
 }
 
 export interface RunResult {
@@ -85,6 +93,7 @@ export interface RunResult {
   committed: CommitRecord[]
   pushed: boolean
   tokenUsage?: TokenUsage
+  aiWarning?: string
 }
 
 export interface RunContext {
