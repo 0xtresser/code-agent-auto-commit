@@ -7,6 +7,7 @@ coverage/
 .opencode/
 .codex/
 .claude/
+.cac/
 .code-agent-auto-commit.json
 
 # Internal-only docs
