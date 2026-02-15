@@ -15,9 +15,9 @@ It runs commits automatically when a chat/agent turn ends.
 cac init
 
 # 2. 配置 AI API Key（必须，否则无法生成 AI commit message）
-#    编辑 .code-agent-auto-commit.json，设置model 和 defaultProvider。
-#    然后在 shell 中导出对应的环境变量：
-export MINIMAX_API_KEY='your-api-key'   # 或 OPENAI_API_KEY 等
+#    编辑 .cac/.code-agent-auto-commit.json，设置 model 和 defaultProvider。
+#    在 .cac/.env 中填入 API Key 后加载：
+source .cac/.env
 
 # 3. 安装钩子
 cac install --tool all --scope project
@@ -37,7 +37,8 @@ cac status --scope project
 
 - `cac init [--worktree <path>] [--config <path>]`
   - Initializes a config file.
-  - Writes to `<worktree>/.code-agent-auto-commit.json` by default; use `--config` for a custom path.
+  - 默认写入 `<worktree>/.cac/.code-agent-auto-commit.json`；也会生成 `.cac/.env.example` 和 `.cac/.env`。
+  - 可通过 `--config` 指定自定义路径。
 
 - `cac install [--tool all|opencode|codex|claude] [--scope project|global] [--worktree <path>] [--config <path>]`
   - Installs auto-commit adapters for selected tools (OpenCode/Codex/Claude).
@@ -54,6 +55,16 @@ cac status --scope project
 - `cac run [--tool opencode|codex|claude|manual] [--worktree <path>] [--config <path>] [--event-json <json>] [--event-stdin]`
   - Executes one auto-commit pass (manual trigger or hook trigger).
   - Runs the configured pipeline: filter files -> stage -> commit -> optional push.
+  - 由聊天结束自动触发时，会把本次输出写到 `.cac/run-<timestamp>.log`。
+
+- `cac ai <message> [--config <path>]`
+  - 发送一条测试消息到当前 AI 配置并打印回复。
+
+- `cac ai set-key <provider|ENV_VAR> <api-key> [--config <path>]`
+  - 全局设置 API Key（写入 `~/.config/code-agent-auto-commit/keys.env`），并自动尝试把 source 语句加入 shell rc。
+
+- `cac ai get-key <provider|ENV_VAR> [--config <path>]`
+  - 查看当前 key 是否已配置（以脱敏形式显示）。
 
 - `cac set-worktree <path> [--config <path>]`
   - Updates only the `worktree` field in config and leaves other settings unchanged.
@@ -68,7 +79,7 @@ cac status --scope project
 
 ## Config File
 
-Default location in repository root: `.code-agent-auto-commit.json`
+Default location in repository root: `.cac/.code-agent-auto-commit.json`
 
 For full field details, see `docs/CONFIG.md`.
 
