@@ -45,9 +45,9 @@ cac --help
 cac init
 
 # 2. Configure AI API key for commit messages
-#    Edit .code-agent-auto-commit.json — set your model, and defaultProvider.
-#    Then export the key in your shell:
-export MINIMAX_API_KEY='your-api-key'   # or OPENAI_API_KEY, etc.
+#    Edit .cac/.code-agent-auto-commit.json — set your model and defaultProvider.
+#    Fill keys in .cac/.env and load them:
+source .cac/.env
 
 # 3. Install hooks
 cac install --tool all --scope project
@@ -79,22 +79,31 @@ cac uninstall [--tool all|opencode|codex|claude] [--scope project|global] [--wor
 cac status [--scope project|global] [--worktree <path>] [--config <path>]
 cac run [--tool opencode|codex|claude|manual] [--worktree <path>] [--config <path>] [--event-json <json>] [--event-stdin]
 cac set-worktree <path> [--config <path>]
+cac ai <message> [--config <path>]
+cac ai set-key <provider|ENV_VAR> <api-key> [--config <path>]
+cac ai get-key <provider|ENV_VAR> [--config <path>]
 ```
 
 ### Command Details
 
-- `cac init`: creates a config file for a worktree. It resolves the target path from `--config` or defaults to `<worktree>/.code-agent-auto-commit.json`.
+- `cac init`: creates `.cac/.code-agent-auto-commit.json` under the worktree (unless `--config` is provided), and also writes `.cac/.env.example` and `.cac/.env` with default provider API key env vars.
 - `cac install`: installs adapters/hooks for selected tools (`opencode`, `codex`, `claude`) in `project` or `global` scope. If no config exists at the resolved path, it creates one first.
 - `cac uninstall`: removes previously installed adapters/hooks for selected tools and scope.
 - `cac status`: prints resolved config path, worktree, commit mode, AI/push toggles, and install status of each adapter.
-- `cac run`: executes one auto-commit pass (manual or hook-triggered). It reads config, filters changed files, stages/commits by configured mode, and optionally pushes.
+- `cac run`: executes one auto-commit pass (manual or hook-triggered). It reads config, filters changed files, stages/commits by configured mode, and optionally pushes. Hook-triggered runs also write logs to `.cac/run-<timestamp>.log`.
 - `cac set-worktree`: updates only the `worktree` field in the resolved config file.
+- `cac ai`: tests AI request (`cac ai "hi"`) or manages global keys (`set-key` / `get-key`).
 
 ## Config File
 
 Default project config file:
 
-`.code-agent-auto-commit.json`
+`.cac/.code-agent-auto-commit.json`
+
+Generated env templates:
+
+- `.cac/.env.example`
+- `.cac/.env`
 
 You can copy from:
 
