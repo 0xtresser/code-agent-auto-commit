@@ -2,6 +2,21 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 
+function formatTimestamp(date: Date): string {
+  const pad = (value: number, size = 2): string => String(value).padStart(size, "0")
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    "-",
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+    pad(date.getSeconds()),
+    "-",
+    pad(date.getMilliseconds(), 3),
+  ].join("")
+}
+
 export function getUserConfigHome(): string {
   const xdg = process.env.XDG_CONFIG_HOME
   if (xdg && xdg.trim().length > 0) {
@@ -11,11 +26,31 @@ export function getUserConfigHome(): string {
 }
 
 export function getProjectConfigPath(worktree: string): string {
+  return path.join(worktree, ".cac", ".code-agent-auto-commit.json")
+}
+
+export function getLegacyProjectConfigPath(worktree: string): string {
   return path.join(worktree, ".code-agent-auto-commit.json")
+}
+
+export function getProjectEnvExamplePath(worktree: string): string {
+  return path.join(worktree, ".cac", ".env.example")
+}
+
+export function getProjectEnvPath(worktree: string): string {
+  return path.join(worktree, ".cac", ".env")
+}
+
+export function getProjectRunLogPath(worktree: string, date = new Date()): string {
+  return path.join(worktree, ".cac", `run-${formatTimestamp(date)}.log`)
 }
 
 export function getGlobalConfigPath(): string {
   return path.join(getUserConfigHome(), "code-agent-auto-commit", "config.json")
+}
+
+export function getGlobalKeysEnvPath(): string {
+  return path.join(getUserConfigHome(), "code-agent-auto-commit", "keys.env")
 }
 
 export function ensureDirForFile(filePath: string): void {
