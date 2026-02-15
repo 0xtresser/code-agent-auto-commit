@@ -19,3 +19,4 @@ session-*.md
 
 # NPM files
 code-agent-auto-commit-*.tgz
+.env
