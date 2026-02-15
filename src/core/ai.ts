@@ -318,6 +318,10 @@ export async function generateCommitMessage(
   summary: CommitSummary,
   maxLength: number,
 ): Promise<AIGenerateResult> {
+  if (!ai.enabled) {
+    return { message: undefined, usage: undefined }
+  }
+
   const configError = validateAIConfig(ai)
   if (configError) {
     return { message: undefined, usage: undefined, warning: configError }
