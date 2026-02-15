@@ -15,8 +15,8 @@ It runs commits automatically when a chat/agent turn ends.
 cac init
 
 # 2. 配置 AI API Key（必须，否则无法生成 AI commit message）
-#    编辑 .code-agent-auto-commit.json，设置 provider、model 和 apiKeyEnv。
-#    或者在 shell 中导出对应的环境变量：
+#    编辑 .code-agent-auto-commit.json，设置model 和 defaultProvider。
+#    然后在 shell 中导出对应的环境变量：
 export MINIMAX_API_KEY='your-api-key'   # 或 OPENAI_API_KEY 等
 
 # 3. 安装钩子
