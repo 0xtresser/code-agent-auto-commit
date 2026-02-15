@@ -1,59 +1,53 @@
-import type { AIConfig, AIProviderConfig, CommitSummary } from "../types"
+import type { AIConfig, AIGenerateResult, AIProviderConfig, CommitSummary, TokenUsage } from "../types"
 
-const DEFAULT_COMMIT_TYPE = "refector"
+const VALID_TYPES = new Set([
+  "feat", "fix", "refactor", "docs", "style", "test",
+  "chore", "perf", "ci", "build", "revert",
+])
 
-function normalizeCommitType(raw: string): "feat" | "fix" | "refector" | undefined {
+const TYPE_ALIASES: Record<string, string> = {
+  feature: "feat",
+  bugfix: "fix",
+  hotfix: "fix",
+  refactoring: "refactor",
+  refector: "refactor",
+}
+
+function normalizeCommitType(raw: string): string | undefined {
   const value = raw.trim().toLowerCase()
-  if (value === "feat" || value === "feature") {
-    return "feat"
+  if (VALID_TYPES.has(value)) {
+    return value
   }
-  if (value === "fix" || value === "bugfix" || value === "hotfix") {
-    return "fix"
-  }
-  if (
-    value === "refector"
-    || value === "refactor"
-    || value === "refactoring"
-    || value === "chore"
-    || value === "docs"
-    || value === "style"
-    || value === "test"
-    || value === "perf"
-    || value === "build"
-    || value === "ci"
-    || value === "revert"
-  ) {
-    return "refector"
-  }
-  return undefined
+  return TYPE_ALIASES[value] ?? undefined
 }
 
 function formatTypedMessage(raw: string, maxLength: number): string {
-  const conventional = raw.match(/^([a-zA-Z-]+)(?:\([^)]*\))?\s*:\s*(.+)$/)
-  const shorthand = raw.match(/^(feat|feature|fix|bugfix|hotfix|refactor|refector)\b[\s:-]+(.+)$/i)
+  const conventional = raw.match(/^([a-zA-Z-]+)(\([^)]*\))?\s*:\s*(.+)$/)
 
-  const detectedType = normalizeCommitType(conventional?.[1] ?? shorthand?.[1] ?? "")
-  const type = detectedType ?? DEFAULT_COMMIT_TYPE
-  const subjectCandidate = (conventional?.[2] ?? shorthand?.[2] ?? raw)
-    .replace(/^['"`]+|['"`]+$/g, "")
-    .replace(/^[-:]+/, "")
-    .trim()
-
-  if (subjectCandidate.length === 0) {
-    return ""
+  if (conventional) {
+    const type = normalizeCommitType(conventional[1]) ?? "chore"
+    const scope = conventional[2] ?? ""
+    const subject = conventional[3]
+      .replace(/^['"`]+|['"`]+$/g, "")
+      .replace(/^[-:]+/, "")
+      .trim()
+    if (subject.length === 0) return ""
+    const full = `${type}${scope}: ${subject}`
+    if (full.length <= maxLength) return full
+    const prefix = `${type}${scope}: `
+    const available = maxLength - prefix.length
+    if (available <= 1) return prefix.trimEnd().slice(0, maxLength)
+    return `${prefix}${subject.slice(0, available - 1).trimEnd()}…`
   }
 
-  const prefix = `${type}: `
-  const full = `${prefix}${subjectCandidate}`
-  if (full.length <= maxLength) {
-    return full
-  }
-
+  const subject = raw.replace(/^['"`]+|['"`]+$/g, "").trim()
+  if (subject.length === 0) return ""
+  const prefix = "chore: "
+  const full = `${prefix}${subject}`
+  if (full.length <= maxLength) return full
   const available = maxLength - prefix.length
-  if (available <= 1) {
-    return prefix.trimEnd().slice(0, maxLength)
-  }
-  return `${prefix}${subjectCandidate.slice(0, available - 1).trimEnd()}…`
+  if (available <= 1) return prefix.trimEnd().slice(0, maxLength)
+  return `${prefix}${subject.slice(0, available - 1).trimEnd()}…`
 }
 
 function normalizeMessage(raw: string, maxLength: number): string {
@@ -127,7 +121,7 @@ async function generateOpenAiStyleMessage(
   summary: CommitSummary,
   maxLength: number,
   signal: AbortSignal,
-): Promise<string | undefined> {
+): Promise<{ content: string | undefined; usage: TokenUsage | undefined }> {
   const apiKey = getApiKey(provider)
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -159,13 +153,21 @@ async function generateOpenAiStyleMessage(
   })
 
   if (!response.ok) {
-    return undefined
+    return { content: undefined, usage: undefined }
   }
 
   const payload = (await response.json()) as {
     choices?: Array<{ message?: { content?: string } }>
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
   }
-  return payload.choices?.[0]?.message?.content
+  const usage: TokenUsage | undefined = payload.usage
+    ? {
+        promptTokens: payload.usage.prompt_tokens ?? 0,
+        completionTokens: payload.usage.completion_tokens ?? 0,
+        totalTokens: payload.usage.total_tokens ?? 0,
+      }
+    : undefined
+  return { content: payload.choices?.[0]?.message?.content, usage }
 }
 
 async function generateAnthropicStyleMessage(
@@ -174,10 +176,10 @@ async function generateAnthropicStyleMessage(
   summary: CommitSummary,
   maxLength: number,
   signal: AbortSignal,
-): Promise<string | undefined> {
+): Promise<{ content: string | undefined; usage: TokenUsage | undefined }> {
   const apiKey = getApiKey(provider)
   if (!apiKey) {
-    return undefined
+    return { content: undefined, usage: undefined }
   }
 
   const headers: Record<string, string> = {
@@ -206,50 +208,60 @@ async function generateAnthropicStyleMessage(
   })
 
   if (!response.ok) {
-    return undefined
+    return { content: undefined, usage: undefined }
   }
 
   const payload = (await response.json()) as {
     content?: Array<{ type?: string; text?: string }>
+    usage?: { input_tokens?: number; output_tokens?: number }
   }
   const firstText = payload.content?.find((item) => item.type === "text")?.text
-  return firstText
+  const usage: TokenUsage | undefined = payload.usage
+    ? {
+        promptTokens: payload.usage.input_tokens ?? 0,
+        completionTokens: payload.usage.output_tokens ?? 0,
+        totalTokens: (payload.usage.input_tokens ?? 0) + (payload.usage.output_tokens ?? 0),
+      }
+    : undefined
+  return { content: firstText, usage }
 }
 
 export async function generateCommitMessage(
   ai: AIConfig,
   summary: CommitSummary,
   maxLength: number,
-): Promise<string | undefined> {
+): Promise<AIGenerateResult> {
+  const empty: AIGenerateResult = { message: undefined, usage: undefined }
+
   if (!ai.enabled) {
-    return undefined
+    return empty
   }
 
   const { provider, model } = splitModelRef(ai.model, ai.defaultProvider)
   if (!provider || !model) {
-    return undefined
+    return empty
   }
 
   const providerConfig = ai.providers[provider]
   if (!providerConfig) {
-    return undefined
+    return empty
   }
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), ai.timeoutMs)
 
   try {
-    let content: string | undefined
+    let result: { content: string | undefined; usage: TokenUsage | undefined }
     if (providerConfig.api === "openai-completions") {
-      content = await generateOpenAiStyleMessage(providerConfig, model, summary, maxLength, controller.signal)
+      result = await generateOpenAiStyleMessage(providerConfig, model, summary, maxLength, controller.signal)
     } else {
-      content = await generateAnthropicStyleMessage(providerConfig, model, summary, maxLength, controller.signal)
+      result = await generateAnthropicStyleMessage(providerConfig, model, summary, maxLength, controller.signal)
     }
 
-    const normalized = normalizeMessage(content ?? "", maxLength)
-    return normalized || undefined
+    const normalized = normalizeMessage(result.content ?? "", maxLength)
+    return { message: normalized || undefined, usage: result.usage }
   } catch {
-    return undefined
+    return empty
   } finally {
     clearTimeout(timeout)
   }
