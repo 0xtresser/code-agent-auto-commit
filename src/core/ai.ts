@@ -104,15 +104,21 @@ function splitModelRef(modelRef: string, defaultProvider: string): { provider: s
 
 function buildUserPrompt(summary: CommitSummary, maxLength: number): string {
   return [
-    `Generate a short commit message in format "<type>: <subject>" (<= ${maxLength} chars).`,
-    "Allowed types: feat, fix, refector.",
+    `Generate a concise commit message (<= ${maxLength} chars) in Conventional Commits format: "<type>(<scope>): <description>".`,
+    "Rules:",
+    "- type: feat | fix | refactor | docs | style | test | chore | perf | ci | build",
+    "- scope: optional, the module or file area affected (e.g. cli, ai, config)",
+    "- description: imperative mood, lowercase, no period, explain WHAT and WHY briefly",
+    "- Do NOT just say 'update <filename>' — describe the actual change",
+    "- Output exactly one line, no quotes, no code block",
+    "",
     "Changed files:",
     summary.nameStatus || "(none)",
     "Diff stat:",
     summary.diffStat || "(none)",
     "Patch excerpt:",
     summary.patch || "(none)",
-  ].join("\n\n")
+  ].join("\n")
 }
 
 async function generateOpenAiStyleMessage(
@@ -141,7 +147,7 @@ async function generateOpenAiStyleMessage(
         {
           role: "system",
           content:
-            "You generate exactly one commit message line in format '<type>: <subject>'. Type must be one of feat, fix, refector. No quotes. No code block.",
+            "You generate exactly one conventional commit message. Format: '<type>(<scope>): <description>'. Scope is optional. Allowed types: feat, fix, refactor, docs, style, test, chore, perf, ci, build. Description must be imperative, lowercase, no period. Describe the actual change, not just 'update <file>'. No quotes. No code block.",
         },
         {
           role: "user",
@@ -188,7 +194,7 @@ async function generateAnthropicStyleMessage(
       model,
       max_tokens: 120,
       temperature: 0.2,
-      system: "Generate exactly one commit message line in format '<type>: <subject>'. Type must be feat, fix, or refector.",
+      system: "Generate exactly one conventional commit message. Format: '<type>(<scope>): <description>'. Scope is optional. Allowed types: feat, fix, refactor, docs, style, test, chore, perf, ci, build. Description must be imperative, lowercase, no period. Describe the actual change, not just 'update <file>'. No quotes. No code block.",
       messages: [
         {
           role: "user",
