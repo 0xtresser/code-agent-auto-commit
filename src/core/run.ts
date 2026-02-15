@@ -2,6 +2,7 @@ import path from "node:path"
 import { generateCommitMessage } from "./ai"
 import { loadConfig } from "./config"
 import { shouldIncludePath } from "./filter"
+import { loadProjectAndGlobalEnv } from "./fs"
 import {
   commit,
   ensureGitRepository,
@@ -91,6 +92,7 @@ async function buildMessage(
 export async function runAutoCommit(context: RunContext, configOptions: LoadConfigOptions): Promise<RunResult> {
   const { config } = loadConfig(configOptions)
   const worktree = path.resolve(context.worktree ?? config.worktree)
+  loadProjectAndGlobalEnv(worktree)
 
   if (!config.enabled) {
     return {

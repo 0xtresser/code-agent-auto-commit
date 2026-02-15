@@ -14,6 +14,7 @@ import {
   getProjectEnvExamplePath,
   getProjectEnvPath,
   getProjectRunLogPath,
+  loadProjectAndGlobalEnv,
   writeTextFile,
 } from "./core/fs"
 import { runAutoCommit } from "./core/run"
@@ -440,6 +441,7 @@ async function commandAI(flags: Record<string, string | boolean>, positionals: s
   const worktree = path.resolve(getStringFlag(flags, "worktree") ?? process.cwd())
   const explicitConfig = getStringFlag(flags, "config")
   const loaded = loadConfig({ explicitPath: explicitConfig, worktree })
+  loadProjectAndGlobalEnv(worktree)
 
   const subcommand = positionals[0]
 

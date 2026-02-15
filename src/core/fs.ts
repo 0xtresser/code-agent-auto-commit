@@ -74,3 +74,34 @@ export function writeTextFile(filePath: string, content: string): void {
   ensureDirForFile(filePath)
   fs.writeFileSync(filePath, content, "utf8")
 }
+
+function parseEnvValue(raw: string): string {
+  const trimmed = raw.trim()
+  if ((trimmed.startsWith("'") && trimmed.endsWith("'")) ||
+      (trimmed.startsWith("\"") && trimmed.endsWith("\""))) {
+    return trimmed.slice(1, -1)
+  }
+  return trimmed
+}
+
+export function loadEnvFileIntoProcess(filePath: string): void {
+  if (!fs.existsSync(filePath)) {
+    return
+  }
+  const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/)
+  for (const line of lines) {
+    const match = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/)
+    if (!match) {
+      continue
+    }
+    const [, key, rawValue] = match
+    if (process.env[key] === undefined || process.env[key] === "") {
+      process.env[key] = parseEnvValue(rawValue)
+    }
+  }
+}
+
+export function loadProjectAndGlobalEnv(worktree: string): void {
+  loadEnvFileIntoProcess(getGlobalKeysEnvPath())
+  loadEnvFileIntoProcess(getProjectEnvPath(worktree))
+}

@@ -11,6 +11,7 @@ export function runCommand(command: string, args: string[], cwd: string): Comman
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
+    maxBuffer: 10 * 1024 * 1024,
   })
 
   return {
