@@ -1,4 +1,4 @@
-import type { AIConfig, AIGenerateResult, AIProviderConfig, CommitSummary, TokenUsage } from "../types"
+import type { AIConfig, AIGenerateResult, AIProviderConfig, AITestResult, CommitSummary, TokenUsage } from "../types"
 
 const VALID_TYPES = new Set([
   "feat", "fix", "refactor", "docs", "style", "test",
@@ -115,13 +115,36 @@ function buildUserPrompt(summary: CommitSummary, maxLength: number): string {
   ].join("\n")
 }
 
+function validateAIConfig(ai: AIConfig): string | undefined {
+  if (!ai.enabled) {
+    return "ai.enabled is false"
+  }
+  const { provider, model } = splitModelRef(ai.model, ai.defaultProvider)
+  if (!provider || !model) {
+    return `invalid ai.model "${ai.model}" — expected "provider/model" format`
+  }
+  const providerConfig = ai.providers[provider]
+  if (!providerConfig) {
+    return `provider "${provider}" not found in ai.providers (available: ${Object.keys(ai.providers).join(", ") || "none"})`
+  }
+  const apiKey = getApiKey(providerConfig)
+  if (!apiKey) {
+    const envName = providerConfig.apiKeyEnv
+    if (envName) {
+      return `API key not found — env var "${envName}" is not set. Run: export ${envName}='your-key'`
+    }
+    return `no API key configured for provider "${provider}" — set apiKeyEnv or apiKey in config`
+  }
+  return undefined
+}
+
 async function generateOpenAiStyleMessage(
   provider: AIProviderConfig,
   model: string,
   summary: CommitSummary,
   maxLength: number,
   signal: AbortSignal,
-): Promise<{ content: string | undefined; usage: TokenUsage | undefined }> {
+): Promise<{ content: string | undefined; usage: TokenUsage | undefined; error?: string }> {
   const apiKey = getApiKey(provider)
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -153,7 +176,8 @@ async function generateOpenAiStyleMessage(
   })
 
   if (!response.ok) {
-    return { content: undefined, usage: undefined }
+    const body = await response.text().catch(() => "")
+    return { content: undefined, usage: undefined, error: `HTTP ${response.status}: ${body.slice(0, 200)}` }
   }
 
   const payload = (await response.json()) as {
@@ -176,10 +200,10 @@ async function generateAnthropicStyleMessage(
   summary: CommitSummary,
   maxLength: number,
   signal: AbortSignal,
-): Promise<{ content: string | undefined; usage: TokenUsage | undefined }> {
+): Promise<{ content: string | undefined; usage: TokenUsage | undefined; error?: string }> {
   const apiKey = getApiKey(provider)
   if (!apiKey) {
-    return { content: undefined, usage: undefined }
+    return { content: undefined, usage: undefined, error: "no API key" }
   }
 
   const headers: Record<string, string> = {
@@ -208,7 +232,8 @@ async function generateAnthropicStyleMessage(
   })
 
   if (!response.ok) {
-    return { content: undefined, usage: undefined }
+    const body = await response.text().catch(() => "")
+    return { content: undefined, usage: undefined, error: `HTTP ${response.status}: ${body.slice(0, 200)}` }
   }
 
   const payload = (await response.json()) as {
@@ -231,37 +256,120 @@ export async function generateCommitMessage(
   summary: CommitSummary,
   maxLength: number,
 ): Promise<AIGenerateResult> {
-  const empty: AIGenerateResult = { message: undefined, usage: undefined }
-
-  if (!ai.enabled) {
-    return empty
+  const configError = validateAIConfig(ai)
+  if (configError) {
+    return { message: undefined, usage: undefined, warning: configError }
   }
 
   const { provider, model } = splitModelRef(ai.model, ai.defaultProvider)
-  if (!provider || !model) {
-    return empty
-  }
-
   const providerConfig = ai.providers[provider]
-  if (!providerConfig) {
-    return empty
-  }
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), ai.timeoutMs)
 
   try {
-    let result: { content: string | undefined; usage: TokenUsage | undefined }
+    let result: { content: string | undefined; usage: TokenUsage | undefined; error?: string }
     if (providerConfig.api === "openai-completions") {
       result = await generateOpenAiStyleMessage(providerConfig, model, summary, maxLength, controller.signal)
     } else {
       result = await generateAnthropicStyleMessage(providerConfig, model, summary, maxLength, controller.signal)
     }
 
+    if (result.error) {
+      return { message: undefined, usage: result.usage, warning: result.error }
+    }
+
     const normalized = normalizeMessage(result.content ?? "", maxLength)
     return { message: normalized || undefined, usage: result.usage }
-  } catch {
-    return empty
+  } catch (err) {
+    const msg = err instanceof Error && err.name === "AbortError"
+      ? `AI request timed out after ${ai.timeoutMs}ms`
+      : `AI request failed: ${err instanceof Error ? err.message : String(err)}`
+    return { message: undefined, usage: undefined, warning: msg }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+export async function testAI(ai: AIConfig, userMessage: string): Promise<AITestResult> {
+  const configError = validateAIConfig(ai)
+  if (configError) {
+    return { ok: false, error: configError }
+  }
+
+  const { provider, model } = splitModelRef(ai.model, ai.defaultProvider)
+  const providerConfig = ai.providers[provider]
+  const apiKey = getApiKey(providerConfig)!
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), ai.timeoutMs)
+
+  try {
+    if (providerConfig.api === "openai-completions") {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        ...(providerConfig.headers ?? {}),
+      }
+      const response = await fetch(`${providerConfig.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model,
+          temperature: 0.2,
+          messages: [{ role: "user", content: userMessage }],
+        }),
+        signal: controller.signal,
+      })
+      if (!response.ok) {
+        const body = await response.text().catch(() => "")
+        return { ok: false, error: `HTTP ${response.status}: ${body.slice(0, 300)}` }
+      }
+      const payload = (await response.json()) as {
+        choices?: Array<{ message?: { content?: string } }>
+        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
+      }
+      const reply = payload.choices?.[0]?.message?.content ?? ""
+      const usage: TokenUsage | undefined = payload.usage
+        ? { promptTokens: payload.usage.prompt_tokens ?? 0, completionTokens: payload.usage.completion_tokens ?? 0, totalTokens: payload.usage.total_tokens ?? 0 }
+        : undefined
+      return { ok: true, reply, usage }
+    } else {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        ...(providerConfig.headers ?? {}),
+      }
+      const response = await fetch(`${providerConfig.baseUrl.replace(/\/$/, "")}/messages`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model,
+          max_tokens: 256,
+          messages: [{ role: "user", content: userMessage }],
+        }),
+        signal: controller.signal,
+      })
+      if (!response.ok) {
+        const body = await response.text().catch(() => "")
+        return { ok: false, error: `HTTP ${response.status}: ${body.slice(0, 300)}` }
+      }
+      const payload = (await response.json()) as {
+        content?: Array<{ type?: string; text?: string }>
+        usage?: { input_tokens?: number; output_tokens?: number }
+      }
+      const reply = payload.content?.find((item) => item.type === "text")?.text ?? ""
+      const usage: TokenUsage | undefined = payload.usage
+        ? { promptTokens: payload.usage.input_tokens ?? 0, completionTokens: payload.usage.output_tokens ?? 0, totalTokens: (payload.usage.input_tokens ?? 0) + (payload.usage.output_tokens ?? 0) }
+        : undefined
+      return { ok: true, reply, usage }
+    }
+  } catch (err) {
+    const msg = err instanceof Error && err.name === "AbortError"
+      ? `request timed out after ${ai.timeoutMs}ms`
+      : `request failed: ${err instanceof Error ? err.message : String(err)}`
+    return { ok: false, error: msg }
   } finally {
     clearTimeout(timeout)
   }
