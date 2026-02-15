@@ -3,8 +3,9 @@
 `cac` reads JSON config from:
 
 1. `--config <path>` if provided
-2. `<worktree>/.code-agent-auto-commit.json` if it exists
-3. `~/.config/code-agent-auto-commit/config.json`
+2. `<worktree>/.cac/.code-agent-auto-commit.json` if it exists
+3. `<worktree>/.code-agent-auto-commit.json` if it exists (legacy path)
+4. `~/.config/code-agent-auto-commit/config.json`
 
 ## Schema
 
@@ -70,3 +71,5 @@
   - `gitlab`: remote URL must contain `gitlab`
   - `generic`: no provider URL validation
 - Keep API keys in environment variables when possible.
+- `cac init` also creates `.cac/.env.example` and `.cac/.env` with provider key variables.
+- Hook-triggered `cac run` writes output logs to `.cac/run-<timestamp>.log`.
