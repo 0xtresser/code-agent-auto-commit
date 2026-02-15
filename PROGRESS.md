@@ -20,6 +20,12 @@ Format: `[Date] [Task] [Issue] [Solution]`
 - **Issue**: Model `MiniMax-M2.1-highspeed` does not exist on the international endpoint (`api.minimaxi.chat`)
 - **Solution**: Switched default model to `MiniMax-M2.5-highspeed` which is available internationally. Available models on intl: `MiniMax-M2.5`, `MiniMax-M2.5-highspeed`, `MiniMax-M2.1`, `MiniMax-Text-01`.
 
+### Bug Fix: Rename/Copy Path Swap in git.ts
+
+- **Task**: Fix `cac run` failing on renamed files with `fatal: pathspec did not match any files`
+- **Issue**: `listChangedFiles` in `git.ts` had `path` and `originalPath` swapped for rename/copy entries. `git status --porcelain -z` outputs `XY NEW_PATH\0OLD_PATH\0`, but code assigned `secondPath` (old path) as `file.path`, causing `stagePath` to `git add` a path that no longer exists.
+- **Solution**: Swapped assignment — `path: firstPath` (new), `originalPath: renamedFrom` (old). Renamed variable `secondPath` → `renamedFrom` for clarity.
+
 ### Project Structure Alignment
 
 - **Task**: Align project structure with AGENTS.md conventions
