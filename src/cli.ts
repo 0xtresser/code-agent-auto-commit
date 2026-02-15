@@ -102,6 +102,7 @@ Usage:
   cac status [--scope project|global] [--worktree <path>] [--config <path>]
   cac run [--tool opencode|codex|claude|manual] [--worktree <path>] [--config <path>] [--event-json <json>] [--event-stdin]
   cac set-worktree <path> [--config <path>]
+  cac version
 `)
 }
 
@@ -291,6 +292,12 @@ async function main(): Promise<void> {
 
   if (!command || command === "help" || command === "--help") {
     printHelp()
+    return
+  }
+
+  if (command === "version" || command === "--version" || command === "-v") {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "package.json"), "utf-8"))
+    console.log(pkg.version)
     return
   }
 
