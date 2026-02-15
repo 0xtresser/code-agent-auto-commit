@@ -22,10 +22,10 @@ const DEFAULT_CONFIG = (worktree: string): AutoCommitConfig => ({
     maxMessageLength: 72,
   },
   ai: {
-    enabled: false,
+    enabled: true,
     timeoutMs: 15000,
-    model: "openai/gpt-4.1-mini",
-    defaultProvider: "openai",
+    model: "minimax/MiniMax-M2.5-highspeed",
+    defaultProvider: "minimax",
     providers: {
       openai: {
         api: "openai-completions",
@@ -37,11 +37,6 @@ const DEFAULT_CONFIG = (worktree: string): AutoCommitConfig => ({
         baseUrl: "https://api.anthropic.com/v1",
         apiKeyEnv: "ANTHROPIC_API_KEY",
       },
-      openrouter: {
-        api: "openai-completions",
-        baseUrl: "https://openrouter.ai/api/v1",
-        apiKeyEnv: "OPENROUTER_API_KEY",
-      },
       moonshot: {
         api: "openai-completions",
         baseUrl: "https://api.moonshot.ai/v1",
@@ -52,11 +47,6 @@ const DEFAULT_CONFIG = (worktree: string): AutoCommitConfig => ({
         baseUrl: "https://api.minimaxi.chat/v1",
         apiKeyEnv: "MINIMAX_API_KEY",
       },
-      "kimi-coding": {
-        api: "anthropic-messages",
-        baseUrl: "https://api.moonshot.ai/anthropic",
-        apiKeyEnv: "KIMI_API_KEY",
-      },
       ollama: {
         api: "openai-completions",
         baseUrl: "http://127.0.0.1:11434/v1",
@@ -65,10 +55,10 @@ const DEFAULT_CONFIG = (worktree: string): AutoCommitConfig => ({
     },
   },
   push: {
-    enabled: false,
+    enabled: true,
     provider: "github",
     remote: "origin",
-    branch: "",
+    branch: "main",
   },
   filters: {
     include: [],
@@ -130,11 +120,11 @@ function normalizeConfig(config: AutoCommitConfig): AutoCommitConfig {
   }
 
   if (!config.ai.model.trim()) {
-    config.ai.model = "openai/gpt-4.1-mini"
+    config.ai.model = "minimax/MiniMax-M2.5-highspeed"
   }
 
   if (!config.ai.defaultProvider.trim()) {
-    config.ai.defaultProvider = "openai"
+    config.ai.defaultProvider = "minimax"
   }
 
   const allowedApis = new Set(["openai-completions", "anthropic-messages"])

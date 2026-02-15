@@ -10,8 +10,8 @@
   "ai": {
     "enabled": true,
     "timeoutMs": 15000,
-    "model": "openai/gpt-4.1-mini",
-    "defaultProvider": "openai",
+    "model": "minimax/MiniMax-M2.5-highspeed",
+    "defaultProvider": "minimax",
     "providers": {
       "openai": {
         "api": "openai-completions",
@@ -41,7 +41,7 @@
     }
   },
   "push": {
-    "enabled": false,
+    "enabled": true,
     "provider": "github",
     "remote": "origin",
     "branch": "main"
