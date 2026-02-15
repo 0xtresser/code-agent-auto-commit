@@ -28,6 +28,8 @@ To update to the latest version:
 
 ```bash
 pnpm update -g code-agent-auto-commit
+OR:
+pnpm add -g code-agent-auto-commit@latest
 ```
 
 Then use the short command:
