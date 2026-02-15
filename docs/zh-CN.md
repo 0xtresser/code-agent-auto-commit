@@ -18,6 +18,8 @@ cac init
 #    编辑 .cac/.code-agent-auto-commit.json，设置 model 和 defaultProvider。
 #    在 .cac/.env 中填入 API Key 后加载：
 source .cac/.env
+#    或者:
+cac ai set-key <provider|ENV_VAR> <api-key> [--config <path>]
 
 # 3. 安装钩子
 cac install --tool all --scope project

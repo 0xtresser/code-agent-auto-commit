@@ -48,6 +48,8 @@ cac init
 #    Edit .cac/.code-agent-auto-commit.json — set your model and defaultProvider.
 #    Fill keys in .cac/.env and load them:
 source .cac/.env
+#    OR:
+cac ai set-key <provider|ENV_VAR> <api-key> [--config <path>]
 
 # 3. Install hooks
 cac install --tool all --scope project
