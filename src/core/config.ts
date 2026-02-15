@@ -1,6 +1,15 @@
 import fs from "node:fs"
 import path from "node:path"
-import { getGlobalConfigPath, getProjectConfigPath, readJsonFile, writeJsonFile } from "./fs"
+import {
+  getGlobalConfigPath,
+  getLegacyProjectConfigPath,
+  getProjectConfigPath,
+  getProjectEnvExamplePath,
+  getProjectEnvPath,
+  readJsonFile,
+  writeJsonFile,
+  writeTextFile,
+} from "./fs"
 import type { AutoCommitConfig, LoadConfigOptions } from "../types"
 
 const DEFAULT_CONFIG = (worktree: string): AutoCommitConfig => ({
@@ -145,6 +154,27 @@ function normalizeConfig(config: AutoCommitConfig): AutoCommitConfig {
   return config
 }
 
+function buildProjectEnvContent(config: AutoCommitConfig): string {
+  const envNames = Array.from(new Set(
+    Object.values(config.ai.providers)
+      .map((provider) => provider.apiKeyEnv?.trim())
+      .filter((name): name is string => Boolean(name)),
+  )).sort()
+
+  const lines = [
+    "# code-agent-auto-commit local AI keys",
+    "# Fill values and run: source .cac/.env",
+    "",
+  ]
+
+  for (const envName of envNames) {
+    lines.push(`${envName}=`)
+  }
+
+  lines.push("")
+  return lines.join("\n")
+}
+
 export function resolveConfigPath(options: LoadConfigOptions): string {
   if (options.explicitPath) {
     return path.resolve(options.explicitPath)
@@ -155,6 +185,12 @@ export function resolveConfigPath(options: LoadConfigOptions): string {
   if (fs.existsSync(projectPath)) {
     return projectPath
   }
+
+  const legacyProjectPath = getLegacyProjectConfigPath(cwd)
+  if (fs.existsSync(legacyProjectPath)) {
+    return legacyProjectPath
+  }
+
   return getGlobalConfigPath()
 }
 
@@ -174,8 +210,18 @@ export function loadConfig(options: LoadConfigOptions): { config: AutoCommitConf
 }
 
 export function initConfigFile(targetPath: string, worktree: string): AutoCommitConfig {
-  const config = DEFAULT_CONFIG(path.resolve(worktree))
+  const resolvedWorktree = path.resolve(worktree)
+  const config = DEFAULT_CONFIG(resolvedWorktree)
   writeJsonFile(targetPath, config)
+
+  const envExamplePath = getProjectEnvExamplePath(resolvedWorktree)
+  writeTextFile(envExamplePath, buildProjectEnvContent(config))
+
+  const envPath = getProjectEnvPath(resolvedWorktree)
+  if (!fs.existsSync(envPath)) {
+    writeTextFile(envPath, buildProjectEnvContent(config))
+  }
+
   return config
 }
 
