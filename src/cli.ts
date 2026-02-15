@@ -5,6 +5,7 @@ import path from "node:path"
 import { claudeAdapterStatus, installClaudeAdapter, uninstallClaudeAdapter } from "./adapters/claude"
 import { codexAdapterStatus, installCodexAdapter, uninstallCodexAdapter } from "./adapters/codex"
 import { installOpenCodeAdapter, opencodeAdapterStatus, uninstallOpenCodeAdapter } from "./adapters/opencode"
+import { testAI } from "./core/ai"
 import { initConfigFile, loadConfig, resolveConfigPath, updateConfigWorktree } from "./core/config"
 import { getProjectConfigPath } from "./core/fs"
 import { runAutoCommit } from "./core/run"
@@ -102,6 +103,7 @@ Usage:
   cac status [--scope project|global] [--worktree <path>] [--config <path>]
   cac run [--tool opencode|codex|claude|manual] [--worktree <path>] [--config <path>] [--event-json <json>] [--event-stdin]
   cac set-worktree <path> [--config <path>]
+  cac ai <message> [--config <path>]
   cac version
 `)
 }
@@ -286,6 +288,43 @@ async function commandRun(flags: Record<string, string | boolean>, positionals: 
   if (result.tokenUsage) {
     console.log(`AI tokens: ${result.tokenUsage.totalTokens} (prompt: ${result.tokenUsage.promptTokens}, completion: ${result.tokenUsage.completionTokens})`)
   }
+  if (result.aiWarning) {
+    console.warn(`\nWarning: AI commit message failed — ${result.aiWarning}`)
+    console.warn(`Using fallback prefix instead. Run "cac ai hello" to test your AI config.`)
+  }
+}
+
+async function commandAI(flags: Record<string, string | boolean>, positionals: string[]): Promise<void> {
+  const message = positionals.join(" ").trim()
+  if (!message) {
+    console.error(`Usage: cac ai <message>`)
+    console.error(`Example: cac ai "hello, are you there?"`)
+    process.exitCode = 1
+    return
+  }
+
+  const worktree = path.resolve(getStringFlag(flags, "worktree") ?? process.cwd())
+  const explicitConfig = getStringFlag(flags, "config")
+  const loaded = loadConfig({ explicitPath: explicitConfig, worktree })
+
+  console.log(`Provider: ${loaded.config.ai.defaultProvider}`)
+  console.log(`Model: ${loaded.config.ai.model}`)
+  console.log(`Sending: "${message}"`)
+  console.log()
+
+  const result = await testAI(loaded.config.ai, message)
+
+  if (!result.ok) {
+    console.error(`AI test failed: ${result.error}`)
+    process.exitCode = 1
+    return
+  }
+
+  console.log(`Reply: ${result.reply}`)
+  if (result.usage) {
+    console.log(`Tokens: ${result.usage.totalTokens} (prompt: ${result.usage.promptTokens}, completion: ${result.usage.completionTokens})`)
+  }
+  console.log(`\nAI is configured correctly.`)
 }
 
 async function main(): Promise<void> {
@@ -331,6 +370,11 @@ async function main(): Promise<void> {
 
   if (command === "run") {
     await commandRun(parsed.flags, parsed.positionals)
+    return
+  }
+
+  if (command === "ai") {
+    await commandAI(parsed.flags, parsed.positionals)
     return
   }
 
