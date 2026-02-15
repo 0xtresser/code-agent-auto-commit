@@ -1,6 +1,6 @@
 {
   "name": "code-agent-auto-commit",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "CAC provides configurable AI auto-commit(using your git account) for OpenCode, Claude Code, Codex, and other AI code agents",
   "license": "MIT",
   "type": "commonjs",
