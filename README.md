@@ -24,6 +24,12 @@
 pnpm add -g code-agent-auto-commit
 ```
 
+To update to the latest version:
+
+```bash
+pnpm update -g code-agent-auto-commit
+```
+
 Then use the short command:
 
 ```bash
