@@ -55,7 +55,7 @@ cac install --tool all --scope project
 
 # 4. Verify
 cac status --scope project
-cac ai "hello"
+cac ai "hi"
 
 # 5. Agentic coding
 opencode / claude / codex
