@@ -283,6 +283,9 @@ async function commandRun(flags: Record<string, string | boolean>, positionals: 
     console.log(`- ${item.hash.slice(0, 12)} ${item.message}`)
   }
   console.log(`Pushed: ${result.pushed ? "yes" : "no"}`)
+  if (result.tokenUsage) {
+    console.log(`AI tokens: ${result.tokenUsage.totalTokens} (prompt: ${result.tokenUsage.promptTokens}, completion: ${result.tokenUsage.completionTokens})`)
+  }
 }
 
 async function main(): Promise<void> {
