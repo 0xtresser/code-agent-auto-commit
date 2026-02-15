@@ -21,7 +21,7 @@
 ## Installation
 
 ```bash
-pnpm add -g code-agent-auto-commit
+pnpm add -g code-agent-auto-commit@latest
 ```
 
 To update to the latest version:
